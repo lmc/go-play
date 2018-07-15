@@ -39,7 +39,6 @@
 #include "../components/odroid/odroid_system.h"
 #include "../components/odroid/odroid_sdcard.h"
 
-
 extern int debug_trace;
 
 struct fb fb;
@@ -68,6 +67,12 @@ const char* StateFileName = "/storage/gnuboy.sav";
 #define AUDIO_SAMPLE_RATE (32000)
 
 const char* SD_BASE_PATH = "/sd";
+
+// --- ADDITIONS
+char serial_in[32];
+// make CONFIG_PYTHON=python3
+// python3 /Users/barry/Sites/esp-idf/components/esptool_py/esptool/esptool.py --chip esp32 --port /dev/cu.SLAB_USBtoUART --baud 921600 write_flash -fs detect --flash_freq 40m --flash_mode qio 0x300000 /Users/barry/Sites/go-play/gnuboy-go/build/gnuboy-go.bin
+
 
 // --- MAIN
 QueueHandle_t vidQueue;
@@ -179,6 +184,8 @@ void videoTask(void *arg)
 
         ili9341_write_frame_gb(param, scaling_enabled);
         odroid_input_battery_level_read(&battery_state);
+
+
 
         xQueueReceive(vidQueue, &param, portMAX_DELAY);
     }
@@ -420,7 +427,7 @@ static void DoMenuHome()
 
 void app_main(void)
 {
-    printf("gnuboy start.\n");
+    printf("gnuboy mod start.\n");
 
     nvs_flash_init();
 
@@ -592,6 +599,9 @@ void app_main(void)
     }
 
 
+    printf("gnuboy mod main loop starting.\n");
+
+
     odroid_input_gamepad_read(&lastJoysticState);
 
     while (true)
@@ -684,10 +694,73 @@ void app_main(void)
           float seconds = totalElapsedTime / (CONFIG_ESP32_DEFAULT_CPU_FREQ_MHZ * 1000000.0f); // 240000000.0f; // (240Mhz)
           float fps = actualFrameCount / seconds;
 
-          printf("HEAP:0x%x, FPS:%f, BATTERY:%d [%d]\n", esp_get_free_heap_size(), fps, battery_state.millivolts, battery_state.percentage);
+          // printf("HEAP:0x%x, FPS:%f, BATTERY:%d [%d]\n", esp_get_free_heap_size(), fps, battery_state.millivolts, battery_state.percentage);
 
           actualFrameCount = 0;
           totalElapsedTime = 0;
+
+
+
+          if( gets(serial_in) ){
+
+            // RTC prefix
+            if(serial_in[0] == 'R' && serial_in[1] == 'T' && serial_in[2] == 'C'){
+
+              // RTC.h= prefix
+              if(serial_in[3] == '.' && serial_in[5] == '='){
+
+                int value = 0;
+                value += serial_in[6] - 48;
+                if(serial_in[7]){
+                  value *= 10;
+                  value += serial_in[7] - 48;
+                }
+                if(serial_in[8]){
+                  value *= 10;
+                  value += serial_in[8] - 48;
+                }
+                if(value < 0)
+                  value = 0;
+                printf("value: %d\n",value);
+
+                switch( serial_in[4] ){
+                  case 'c':
+                    if(value > 0)
+                      value = 1;
+                    rtc.carry = value;
+                    break;
+                  case 'd':
+                    if(value > 364)
+                      value = 364;
+                    rtc.d = value;
+                    break;
+                  case 'h':
+                    if(value > 23)
+                      value = 23;
+                    rtc.h = value;
+                    break;
+                  case 'm':
+                    if(value > 59)
+                      value = 59;
+                    rtc.m = value;
+                    break;
+                  case 's':
+                    if(value > 59)
+                      value = 59;
+                    rtc.s = value;
+                    break;
+                }
+
+                printf("value: %d\n",value);
+
+                printf("RTC: carry: %d, d: %d, h: %d, m: %d, s: %d, t: %d\n",rtc.carry,rtc.d,rtc.h,rtc.m,rtc.s,rtc.t);
+
+              }else{
+                printf("RTC: carry: %d, d: %d, h: %d, m: %d, s: %d, t: %d\n",rtc.carry,rtc.d,rtc.h,rtc.m,rtc.s,rtc.t);
+              }
+            }
+          }
         }
+
     }
 }
