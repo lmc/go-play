@@ -66,10 +66,104 @@ const char* StateFileName = "/storage/gnuboy.sav";
 #define AUDIO_SAMPLE_RATE (32000)
 
 
-// --- ADDITIONS
-char serial_in[32];
 // make CONFIG_PYTHON=python3
 // python3 /Users/barry/Sites/esp-idf/components/esptool_py/esptool/esptool.py --chip esp32 --port /dev/cu.SLAB_USBtoUART --baud 921600 write_flash -fs detect --flash_freq 40m --flash_mode qio 0x300000 /Users/barry/Sites/go-play/gnuboy-go/build/gnuboy-go.bin
+// --- ADDITIONS
+#define SERIAL_BUFFER_SIZE 32
+char serial_in[SERIAL_BUFFER_SIZE];
+byte serial_i = 0;
+
+void serial_in_cursor_set(byte i){
+  serial_i = i;
+}
+int serial_in_get_int(){
+  int r = 0;
+  byte v = 0;
+  while(true){
+    if(serial_i > SERIAL_BUFFER_SIZE)
+      break;
+    v = serial_in[serial_i];
+    // non-ascii number
+    if(v < 48 || v > 57)
+      break;
+    v -= 48;
+    r *= 10;
+    r += v;
+    serial_i++;
+  }
+  return r;
+}
+
+void gbaext_every_frame(){
+
+}
+
+void gbaext_every_second(){
+
+  if( gets(serial_in) ){
+
+    // RTC prefix
+    if(serial_in[0] == 'R' && serial_in[1] == 'T' && serial_in[2] == 'C'){
+
+      // RTC.h= prefix
+      if(serial_in[3] == '.' && serial_in[5] == '='){
+
+        // int value = 0;
+        // value += serial_in[6] - 48;
+        // if(serial_in[7]){
+        //   value *= 10;
+        //   value += serial_in[7] - 48;
+        // }
+        // if(serial_in[8]){
+        //   value *= 10;
+        //   value += serial_in[8] - 48;
+        // }
+        serial_in_cursor_set(6);
+        int value = serial_in_get_int();
+        if(value < 0)
+          value = 0;
+        printf("value: %d\n",value);
+
+        switch( serial_in[4] ){
+          case 'c':
+            if(value > 0)
+              value = 1;
+            rtc.carry = value;
+            break;
+          case 'd':
+            if(value > 364)
+              value = 364;
+            rtc.d = value;
+            break;
+          case 'h':
+            if(value > 23)
+              value = 23;
+            rtc.h = value;
+            break;
+          case 'm':
+            if(value > 59)
+              value = 59;
+            rtc.m = value;
+            break;
+          case 's':
+            if(value > 59)
+              value = 59;
+            rtc.s = value;
+            break;
+        }
+
+        printf("value: %d\n",value);
+
+        printf("RTC: carry: %d, d: %d, h: %d, m: %d, s: %d, t: %d\n",rtc.carry,rtc.d,rtc.h,rtc.m,rtc.s,rtc.t);
+
+      }else{
+        printf("RTC: carry: %d, d: %d, h: %d, m: %d, s: %d, t: %d\n",rtc.carry,rtc.d,rtc.h,rtc.m,rtc.s,rtc.t);
+      }
+    }
+  }
+
+}
+
 
 
 // --- MAIN
@@ -747,6 +841,8 @@ void app_main(void)
         ++frame;
         ++actualFrameCount;
 
+        gbaext_every_frame();
+
         if (actualFrameCount == 60)
         {
           float seconds = totalElapsedTime / (CONFIG_ESP32_DEFAULT_CPU_FREQ_MHZ * 1000000.0f); // 240000000.0f; // (240Mhz)
@@ -757,67 +853,8 @@ void app_main(void)
           actualFrameCount = 0;
           totalElapsedTime = 0;
 
+          gbaext_every_second();
 
-
-          if( gets(serial_in) ){
-
-            // RTC prefix
-            if(serial_in[0] == 'R' && serial_in[1] == 'T' && serial_in[2] == 'C'){
-
-              // RTC.h= prefix
-              if(serial_in[3] == '.' && serial_in[5] == '='){
-
-                int value = 0;
-                value += serial_in[6] - 48;
-                if(serial_in[7]){
-                  value *= 10;
-                  value += serial_in[7] - 48;
-                }
-                if(serial_in[8]){
-                  value *= 10;
-                  value += serial_in[8] - 48;
-                }
-                if(value < 0)
-                  value = 0;
-                printf("value: %d\n",value);
-
-                switch( serial_in[4] ){
-                  case 'c':
-                    if(value > 0)
-                      value = 1;
-                    rtc.carry = value;
-                    break;
-                  case 'd':
-                    if(value > 364)
-                      value = 364;
-                    rtc.d = value;
-                    break;
-                  case 'h':
-                    if(value > 23)
-                      value = 23;
-                    rtc.h = value;
-                    break;
-                  case 'm':
-                    if(value > 59)
-                      value = 59;
-                    rtc.m = value;
-                    break;
-                  case 's':
-                    if(value > 59)
-                      value = 59;
-                    rtc.s = value;
-                    break;
-                }
-
-                printf("value: %d\n",value);
-
-                printf("RTC: carry: %d, d: %d, h: %d, m: %d, s: %d, t: %d\n",rtc.carry,rtc.d,rtc.h,rtc.m,rtc.s,rtc.t);
-
-              }else{
-                printf("RTC: carry: %d, d: %d, h: %d, m: %d, s: %d, t: %d\n",rtc.carry,rtc.d,rtc.h,rtc.m,rtc.s,rtc.t);
-              }
-            }
-          }
         }
 
     }
