@@ -69,6 +69,11 @@ const char* StateFileName = "/storage/gnuboy.sav";
 // make CONFIG_PYTHON=python3
 // python3 /Users/barry/Sites/esp-idf/components/esptool_py/esptool/esptool.py --chip esp32 --port /dev/cu.SLAB_USBtoUART --baud 921600 write_flash -fs detect --flash_freq 40m --flash_mode qio 0x300000 /Users/barry/Sites/go-play/gnuboy-go/build/gnuboy-go.bin
 // --- ADDITIONS
+
+odroid_gamepad_state lastJoysticState;
+odroid_gamepad_state joystick;
+
+
 #define SERIAL_BUFFER_SIZE 32
 char serial_in[SERIAL_BUFFER_SIZE];
 byte serial_i = 0;
@@ -76,7 +81,53 @@ byte serial_i = 0;
 void serial_in_cursor_set(byte i){
   serial_i = i;
 }
+byte serial_in_pop(){
+  if(serial_i > SERIAL_BUFFER_SIZE)
+    return 0;
+  return serial_in[serial_i++];
+}
+
+int serial_in_get_int_hex(){
+  if(serial_in[serial_i] != '0' || serial_in[serial_i + 1] != 'x')
+    return -1;
+  serial_i += 2;
+  int r = 0;
+  byte v = 0;
+  while(true){
+    if(serial_i > SERIAL_BUFFER_SIZE)
+      break;
+    v = serial_in[serial_i];
+    byte type = 0;
+
+    if( v >= 48 && v <= 57) // 0-9
+      type = 1;
+    if( v >= 65 && v <= 70) // A-F
+      type = 2;
+    if( v >= 97 && v <= 102) // a-f
+      type = 3;
+
+    if(type == 0)
+      break;
+
+    if(type == 1)
+      v -= 48;
+
+    if(type == 2)
+      v = 10 + (v - 65);
+
+    if(type == 3)
+      v = 10 + (v - 97);
+
+    r *= 16;
+    r += v;
+    serial_i++;
+  }
+  return r;
+}
+
 int serial_in_get_int(){
+  if(serial_in[serial_i] == '0' && serial_in[serial_i + 1] == 'x')
+    return serial_in_get_int_hex();
   int r = 0;
   byte v = 0;
   while(true){
@@ -94,73 +145,245 @@ int serial_in_get_int(){
   return r;
 }
 
+
+void gbaext_serial_handler_rtc(){
+
+  // RTC.h= prefix
+  if(serial_in[3] == '.' && serial_in[5] == '='){
+    serial_in_cursor_set(6);
+    int value = serial_in_get_int();
+    if(value < 0)
+      value = 0;
+    printf("value: %d\n",value);
+
+    switch( serial_in[4] ){
+      case 'c':
+        if(value > 0)
+          value = 1;
+        rtc.carry = value;
+        break;
+      case 'd':
+        if(value > 364)
+          value = 364;
+        rtc.d = value;
+        break;
+      case 'h':
+        if(value > 23)
+          value = 23;
+        rtc.h = value;
+        break;
+      case 'm':
+        if(value > 59)
+          value = 59;
+        rtc.m = value;
+        break;
+      case 's':
+        if(value > 59)
+          value = 59;
+        rtc.s = value;
+        break;
+    }
+
+    printf("value: %d\n",value);
+
+    printf("RTC: carry: %d, d: %d, h: %d, m: %d, s: %d, t: %d\n",rtc.carry,rtc.d,rtc.h,rtc.m,rtc.s,rtc.t);
+
+  }else{
+    printf("RTC: carry: %d, d: %d, h: %d, m: %d, s: %d, t: %d\n",rtc.carry,rtc.d,rtc.h,rtc.m,rtc.s,rtc.t);
+  }
+
+}
+
+void gbaext_serial_handler_mem(){
+  // MEMR 4 3000
+  if(serial_in[3] == 'R'){
+    serial_in_cursor_set(5);
+    byte size = serial_in_get_int();
+    serial_in_pop();
+    uint16_t addr = serial_in_get_int();
+    // printf("MEM: read %d at %d (%x)\n",size,addr,addr);
+
+    // crystal: DCDF
+    // gs     : DA2A
+    // KRYS   : 8A,91,98,92
+    // BARR   : 81,80,91,91
+    printf("MEMR[%d,%d]=0x,",size,addr);
+    for(byte i = 0; i < size; i++){
+      byte value = mem_read(addr + i);
+      if(i == size - 1)
+        printf("%x\n",value);
+      else
+        printf("%x,",value);
+    }
+  }
+}
+
+void gbaext_serial_handler_vol(){
+  // VOL=4
+  int vol = odroid_audio_volume_get();
+  if(serial_in[3] == '='){
+    serial_in_cursor_set(4);
+    vol = serial_in_get_int();
+    if(vol < 0)
+      vol = 0;
+    if(vol > ODROID_VOLUME_LEVEL_COUNT)
+      vol = ODROID_VOLUME_LEVEL_COUNT;
+    odroid_audio_volume_set(vol);
+  }
+  printf("VOL=%d\n",vol);
+}
+
+
+void gbaext_init(){
+
+  printf("new code omg :O~\n");
+
+  // for(uint16_t addr = 0xc000; addr < 0xe000; addr++){
+
+  //   if( mem_read(addr) == 0x8a && mem_read(addr+1) == 0x91 && mem_read(addr + 2) == 0x98 && mem_read(addr + 3) == 0x92){
+  //     printf("found KRYS at %d %x\n",addr,addr);
+  //   }
+  //   if( mem_read(addr) == 0x81 && mem_read(addr+1) == 0x80 && mem_read(addr + 2) == 0x91 && mem_read(addr + 3) == 0x91){
+  //     printf("found BARR at %d %x\n",addr,addr);
+  //   }
+
+  // }
+
+
+}
+
+void gbaext_serial_handle(){
+  if( gets(serial_in) ){
+    serial_in_cursor_set(0);
+
+    // RTC prefix
+    if(serial_in[0] == 'R' && serial_in[1] == 'T' && serial_in[2] == 'C'){
+      gbaext_serial_handler_rtc();
+    }
+
+    // MEM prefix
+    if(serial_in[0] == 'M' && serial_in[1] == 'E' && serial_in[2] == 'M'){
+      gbaext_serial_handler_mem();
+    }
+
+    // VOL prefix
+    if(serial_in[0] == 'V' && serial_in[1] == 'O' && serial_in[2] == 'L'){
+      gbaext_serial_handler_vol();
+    }
+
+  }
+}
+
+bool clock_adjust_mode = false;
+int clock_adjust_field = 1;
+bool clock_adjust_mode_just_changed = false;
 void gbaext_every_frame(){
+
+  // gbaext_serial_handle();
+
+  // in_menu = $client.read_uint8( PokeMan::SYMBOLS_CRYSTAL[:ui_in_menu] )
+  // gear_menu = $client.read_uint8( PokeMan::SYMBOLS_CRYSTAL[:ui_gear_card] )
+  // menu_2 = $client.read_uint8( 0xcf71 )
+  // menu_3 = $client.read_uint8( 0xffd6 )
+  // menu_4 = $client.read_uint8( 0xffd7 )
+
+  bool in_pokegear_clock_menu = false;
+  if( mem_read(0xffaa) == 1 && mem_read(0xcf64) == 0 && mem_read(0xcf71) == 161 && mem_read(0xffd6) == 0 && mem_read(0xffd7) == 156 )
+    in_pokegear_clock_menu = true;
+
+  if(clock_adjust_mode_just_changed){
+    clock_adjust_mode_just_changed = false;
+    // joystick.values[ODROID_INPUT_SELECT] = 1;
+    lastJoysticState.values[ODROID_INPUT_SELECT] = 1;
+  }
+
+  if(in_pokegear_clock_menu){
+
+    if(!clock_adjust_mode && joystick.values[ODROID_INPUT_SELECT] && !lastJoysticState.values[ODROID_INPUT_SELECT])
+    {
+      printf("detected select, enabling, cancelling\n");
+      clock_adjust_mode = true;
+      clock_adjust_mode_just_changed = true;
+    }else if(clock_adjust_mode && joystick.values[ODROID_INPUT_SELECT] && !lastJoysticState.values[ODROID_INPUT_SELECT])
+    {
+      printf("detected select, disabling, cancelling\n");
+      clock_adjust_mode = false;
+      clock_adjust_mode_just_changed = true;
+    }
+
+  }else{
+    clock_adjust_mode = false;
+  }
+
+
+  if(clock_adjust_mode || clock_adjust_mode_just_changed){
+    // joystick.values[ODROID_INPUT_SELECT] = 0;
+    // lastJoysticState.values[ODROID_INPUT_SELECT] = 0;
+
+    if(joystick.values[ODROID_INPUT_LEFT] && !lastJoysticState.values[ODROID_INPUT_LEFT]){
+      clock_adjust_field++;
+      if(clock_adjust_field > 2)
+        clock_adjust_field = 0;
+      printf("clock_adjust_field: %d\n",clock_adjust_field);
+    }
+    if(joystick.values[ODROID_INPUT_RIGHT] && !lastJoysticState.values[ODROID_INPUT_RIGHT]){
+      clock_adjust_field--;
+      if(clock_adjust_field < 0)
+        clock_adjust_field = 2;
+      printf("clock_adjust_field: %d\n",clock_adjust_field);
+    }
+
+    if(joystick.values[ODROID_INPUT_UP] && !lastJoysticState.values[ODROID_INPUT_UP]){
+      switch(clock_adjust_field){
+        case 0:
+          rtc.m += 1;
+          if(rtc.m > 59)
+            rtc.m = 59;
+        break;
+        case 1:
+          rtc.h += 1;
+          if(rtc.h > 23)
+            rtc.h = 23;
+        break;
+        case 2:
+          rtc.d += 1;
+          if(rtc.d > 364)
+            rtc.d = 364;
+        break;
+      }
+    }
+    if(joystick.values[ODROID_INPUT_DOWN] && !lastJoysticState.values[ODROID_INPUT_DOWN]){
+      switch(clock_adjust_field){
+        case 0:
+          rtc.m -= 1;
+          if(rtc.m < 0)
+            rtc.m = 0;
+        break;
+        case 1:
+        rtc.h -= 1;
+        if(rtc.h < 0)
+          rtc.h = 0;
+        break;
+        case 2:
+          rtc.d -= 1;
+          if(rtc.d < 0)
+            rtc.d = 0;
+        break;
+      }
+    }
+
+    pad_set(PAD_SELECT, 0);
+    pad_set(PAD_UP, 0);
+    pad_set(PAD_RIGHT, 0);
+    pad_set(PAD_DOWN, 0);
+    pad_set(PAD_LEFT, 0);
+  }
 
 }
 
 void gbaext_every_second(){
 
-  if( gets(serial_in) ){
 
-    // RTC prefix
-    if(serial_in[0] == 'R' && serial_in[1] == 'T' && serial_in[2] == 'C'){
-
-      // RTC.h= prefix
-      if(serial_in[3] == '.' && serial_in[5] == '='){
-
-        // int value = 0;
-        // value += serial_in[6] - 48;
-        // if(serial_in[7]){
-        //   value *= 10;
-        //   value += serial_in[7] - 48;
-        // }
-        // if(serial_in[8]){
-        //   value *= 10;
-        //   value += serial_in[8] - 48;
-        // }
-        serial_in_cursor_set(6);
-        int value = serial_in_get_int();
-        if(value < 0)
-          value = 0;
-        printf("value: %d\n",value);
-
-        switch( serial_in[4] ){
-          case 'c':
-            if(value > 0)
-              value = 1;
-            rtc.carry = value;
-            break;
-          case 'd':
-            if(value > 364)
-              value = 364;
-            rtc.d = value;
-            break;
-          case 'h':
-            if(value > 23)
-              value = 23;
-            rtc.h = value;
-            break;
-          case 'm':
-            if(value > 59)
-              value = 59;
-            rtc.m = value;
-            break;
-          case 's':
-            if(value > 59)
-              value = 59;
-            rtc.s = value;
-            break;
-        }
-
-        printf("value: %d\n",value);
-
-        printf("RTC: carry: %d, d: %d, h: %d, m: %d, s: %d, t: %d\n",rtc.carry,rtc.d,rtc.h,rtc.m,rtc.s,rtc.t);
-
-      }else{
-        printf("RTC: carry: %d, d: %d, h: %d, m: %d, s: %d, t: %d\n",rtc.carry,rtc.d,rtc.h,rtc.m,rtc.s,rtc.t);
-      }
-    }
-  }
 
 }
 
@@ -739,7 +962,7 @@ void app_main(void)
     uint stopTime;
     uint totalElapsedTime = 0;
     uint actualFrameCount = 0;
-    odroid_gamepad_state lastJoysticState;
+    // odroid_gamepad_state lastJoysticState;
 
     ushort menuButtonFrameCount = 0;
     bool ignoreMenuButton = lastJoysticState.values[ODROID_INPUT_MENU];
@@ -756,9 +979,11 @@ void app_main(void)
 
     odroid_input_gamepad_read(&lastJoysticState);
 
+    gbaext_init();
+
     while (true)
     {
-        odroid_gamepad_state joystick;
+        // odroid_gamepad_state joystick;
         odroid_input_gamepad_read(&joystick);
 
         if (ignoreMenuButton)
@@ -811,7 +1036,6 @@ void app_main(void)
             scaling_enabled = !scaling_enabled;
         }
 
-
         pad_set(PAD_UP, joystick.values[ODROID_INPUT_UP]);
         pad_set(PAD_RIGHT, joystick.values[ODROID_INPUT_RIGHT]);
         pad_set(PAD_DOWN, joystick.values[ODROID_INPUT_DOWN]);
@@ -823,6 +1047,7 @@ void app_main(void)
         pad_set(PAD_A, joystick.values[ODROID_INPUT_A]);
         pad_set(PAD_B, joystick.values[ODROID_INPUT_B]);
 
+        gbaext_every_frame();
 
         startTime = xthal_get_ccount();
         run_to_vblank();
@@ -830,7 +1055,6 @@ void app_main(void)
 
 
         lastJoysticState = joystick;
-
 
         if (stopTime > startTime)
           elapsedTime = (stopTime - startTime);
@@ -841,14 +1065,13 @@ void app_main(void)
         ++frame;
         ++actualFrameCount;
 
-        gbaext_every_frame();
 
         if (actualFrameCount == 60)
         {
           float seconds = totalElapsedTime / (CONFIG_ESP32_DEFAULT_CPU_FREQ_MHZ * 1000000.0f); // 240000000.0f; // (240Mhz)
           float fps = actualFrameCount / seconds;
 
-          // printf("HEAP:0x%x, FPS:%f, BATTERY:%d [%d]\n", esp_get_free_heap_size(), fps, battery_state.millivolts, battery_state.percentage);
+          printf("HEAP:0x%x, FPS:%f, BATTERY:%d [%d]\n", esp_get_free_heap_size(), fps, battery_state.millivolts, battery_state.percentage);
 
           actualFrameCount = 0;
           totalElapsedTime = 0;
