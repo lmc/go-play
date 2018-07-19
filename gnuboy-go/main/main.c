@@ -39,6 +39,9 @@
 #include "../components/odroid/odroid_system.h"
 #include "../components/odroid/odroid_sdcard.h"
 
+// #include "./adafruit_gfx.h"
+#include "./adafruit_gfx.c"
+
 extern int debug_trace;
 
 struct fb fb;
@@ -427,9 +430,41 @@ void run_to_vblank()
 
   /* VBLANK BEGIN */
 
+//   for(byte buffid = 0; buffid < 2; buffid++){
+//   //   set_adagfx_buffer(displayBuffer[buffid],160,144);
+//   //   for(int i = 0; i < 140; i++){
+//   //     writePixel(i,i,0xFF0F);
+//   //   }
+//   // }
+//   set_adagfx_buffer(displayBuffer[buffid],160,144);
+//   // writePixel(10,20,0xFF0F);
+//   // writePixel(20,10,0xFF0F);
+//   // for(int i = 10; i < 20; i++){
+//   //   writePixel(i,i,0xFF0F);
+//   // }
+//   // writeFillRect(20,20,20,20,0xFFFF);
+//   // writeFillRect(21,21,20,20,0xFFFF);
+//   writeFillRect(0,0,80,10,0xFFFF);
+//   drawChar(2,2,'O',0x0000,0xFFFF,1);
+//   drawChar(12,2,'M',0x0000,0xFFFF,1);
+//   drawChar(22,2,'G',0x0000,0xFFFF,1);
+
+//   __asm__("memw");
+//   __asm__("nop");
+//   __asm__("nop");
+//   __asm__("nop");
+//   __asm__("nop");
+//   __asm__("nop");
+//   __asm__("nop");
+//   __asm__("nop");
+// }
+
+
+
   //vid_end();
   if ((frame % 2) == 0)
   {
+
       xQueueSend(vidQueue, &framebuffer, portMAX_DELAY);
 
       // swap buffers
@@ -498,6 +533,21 @@ void videoTask(void *arg)
             ili9341_write_frame_gb(NULL, true);
             previous_scale_enabled = scaling_enabled;
         }
+
+        __asm__("memw");
+        // set_adagfx_buffer(param,160,144);
+        // for(int i = 0; i < 140; i++){
+        //   writePixel(i,i,0xFF0F);
+        // }
+        __asm__("memw");
+        // // writePixel(1,1,0xFFFF);
+        // // writePixel(2,2,0x0000);
+        // // writePixel(3,3,0xFFFF);
+        // writeFillRect(0,0,80,10,0xFFFF);
+        // // drawChar(0,0,'O',0x0000,0xFFFF,1);
+        // // drawChar(10,0,'M',0x0000,0xFFFF,1);
+        // // drawChar(20,0,'G',0x0000,0xFFFF,1);
+        // writeFillRect(20,20,20,20,0xFFFF);
 
         ili9341_write_frame_gb(param, scaling_enabled);
         odroid_input_battery_level_read(&battery_state);
