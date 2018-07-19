@@ -241,6 +241,8 @@ void gbaext_init(){
 
   printf("new code omg :O~\n");
 
+  odroid_audio_volume_set(0);
+
   // for(uint16_t addr = 0xc000; addr < 0xe000; addr++){
 
   //   if( mem_read(addr) == 0x8a && mem_read(addr+1) == 0x91 && mem_read(addr + 2) == 0x98 && mem_read(addr + 3) == 0x92){
@@ -395,9 +397,14 @@ void gbaext_before_draw_frame(){
 
   set_adagfx_buffer(framebuffer,160,144);
   writeFillRect(0,0,80,10,0xFFFF);
-  drawChar(2,2,'O',0x0000,0xFFFF,1);
-  drawChar(12,2,'M',0x0000,0xFFFF,1);
-  drawChar(22,2,'G',0x0000,0xFFFF,1);
+  setCursor(2,2);
+  setTextSize(1);
+  setTextColor(0x0000);
+  setTextBgColor(0xFFFF);
+
+  drawPrint("bat: ");
+  drawPrintInt(battery_state.percentage);
+  drawPrint("%");
 
 }
 
@@ -414,7 +421,7 @@ void gbaext_after_screen_write(){
 QueueHandle_t vidQueue;
 QueueHandle_t audioQueue;
 
-float Volume = 1.0f;
+float Volume = 0.1f;
 
 int pcm_submit()
 {
@@ -720,7 +727,7 @@ static void LoadState(const char* cartName)
     }
 
 
-    Volume = odroid_settings_Volume_get();
+    // Volume = odroid_settings_Volume_get();
 }
 
 static void PowerDown()

@@ -336,6 +336,14 @@ void set_adagfx_buffer(uint16_t* value, int16_t width, int16_t height){
 
 
 
+
+int cursor_x = 0;
+int cursor_y = 0;
+bool wrap;
+int textsize = 0;
+uint16_t textcolor = 0x0000;
+uint16_t textbgcolor = 0xFFFF;
+
 void writePixel(uint16_t x, uint16_t y, uint16_t color) {
   // adagfx_buffer[ (y * adagfx_width) + x - 1 ] = color;
   // printf("writePixel addr: %d + %d\n",(int)adagfx_buffer,(y * adagfx_width) + x);
@@ -442,8 +450,56 @@ void drawChar(int16_t x, int16_t y, unsigned char c,
   // endWrite();
 };
 
+int textsize;
 
-#undef int16_t 
-#undef uint8_t 
-#undef int8_t 
-#undef uint16_t
+size_t drawWrite(uint8_t c) {
+  if(c == '\n') {                        // Newline?
+      cursor_x  = 0;                     // Reset x to zero,
+      cursor_y += textsize * 8;          // advance y one line
+  } else if(c != '\r') {                 // Ignore carriage returns
+      if(wrap && ((cursor_x + textsize * 6) > _width)) { // Off right?
+          cursor_x  = 0;                 // Reset x to zero,
+          cursor_y += textsize * 8;      // advance y one line
+      }
+      drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
+      // drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
+      cursor_x += textsize * 6;          // Advance x one char
+  }
+  return 1;
+}
+
+void drawPrint(char *str){
+  for(int i = 0; str[i] != '\0'; i++) {
+    drawWrite(str[i]);
+  }
+}
+
+void drawPrintInt(int i){
+  char str[10];
+  sprintf(str, "%d", i);
+  for(int i = 0; str[i] != '\0'; i++) {
+    drawWrite(str[i]);
+  }
+}
+
+
+void setTextSize(uint8_t s) {
+    textsize = (s > 0) ? s : 1;
+}
+
+void setCursor(int16_t x, int16_t y) {
+    cursor_x = x;
+    cursor_y = y;
+}
+
+void setTextWrap(bool w) {
+    wrap = w;
+}
+
+void setTextColor(uint16_t val){
+  textcolor = val;
+}
+
+void setTextBgColor(uint16_t val){
+  textbgcolor = val;
+}
