@@ -42,6 +42,12 @@
 // #include "./adafruit_gfx.h"
 #include "./adafruit_gfx.c"
 
+// #include "mruby.h"
+// #include "mruby/irep.h"
+// #include "mruby/compile.h"
+// #include "mruby/error.h"
+// #include "mruby/string.h"
+
 extern int debug_trace;
 
 struct fb fb;
@@ -257,11 +263,48 @@ void gbaext_serial_handler_scr(){
 }
 
 
+// mrb_state *mrb;
+// void mruby_task(void *pvParameter)
+// {
+//   printf("starting mruby_task\n");
+//   // printf("starting mruby_task\n");
+
+//   // mrb_state *mrb = mrb_open();
+//   mrb = mrb_open();
+
+//   printf("mruby_task: created\n");
+
+//   mrb_close(mrb);
+
+//   printf("mruby_task: closed\n");
+
+//   // This task should never end, even if the
+//   // script ends.
+//   while (1) {
+//   }
+// }
+
 void gbaext_init(){
 
-  printf("new code omg :O~\n");
+  printf("mruby test :O~\n");
 
   odroid_audio_volume_set(0);
+
+  // printf("creating mruby_task\n");
+  // xTaskCreate(&mruby_task, "mruby_task", 3000, NULL, 5, NULL);
+  // printf("created mruby_task\n");
+
+  // mrb_state *mrb;
+
+  // printf("creating mrb_state\n");
+
+  // mrb = mrb_open();
+
+  // printf("created mrb_state\n");
+
+  // mrb_close(mrb);
+
+  // printf("closed mrb_state\n");
 
   // for(uint16_t addr = 0xc000; addr < 0xe000; addr++){
 
@@ -973,11 +1016,12 @@ void app_main(void)
     }
 
 
-    printf("gnuboy mod main loop starting.\n");
+    printf("main loop starting.\n");
 
 
     odroid_input_gamepad_read(&lastJoysticState);
 
+    printf("running gbaext_init.\n");
     gbaext_init();
 
     while (true)
