@@ -81,6 +81,137 @@ const char* SD_BASE_PATH = "/sd";
 // python3 /Users/barry/Sites/esp-idf/components/esptool_py/esptool/esptool.py --chip esp32 --port /dev/cu.SLAB_USBtoUART --baud 921600 write_flash -fs detect --flash_freq 40m --flash_mode qio 0x300000 /Users/barry/Sites/go-play/gnuboy-go/build/gnuboy-go.bin
 // --- ADDITIONS
 
+bool scaling_enabled = true;
+
+
+byte menu_visible = 0;
+int menu_item_index = 0;
+typedef struct menu_item {
+  char label[16];
+  char value_label[16];
+  int value;
+  void (*callback)(byte);
+};
+
+#define MAX_MENU_ITEMS 8
+byte max_menu_items = MAX_MENU_ITEMS;
+struct menu_item menu_items[MAX_MENU_ITEMS] = {};
+
+void menu_item_callback_volume(byte button){
+  printf("menu_item_callback_volume %d\n",button);
+  int value = menu_items[menu_item_index].value;
+  switch(button){
+    case 255:
+      value = odroid_audio_volume_get();
+    break;
+    case 1:
+      value--;
+      if(value < 0)
+        value++;
+    break;
+    case 2:
+      value++;
+      if(value >= ODROID_VOLUME_LEVEL_COUNT)
+        value--;
+    break;
+  }
+  sprintf(menu_items[menu_item_index].value_label,"%d",value);
+  menu_items[menu_item_index].value = value;
+  if(button != 255){
+    odroid_audio_volume_set(value);
+  }
+};
+
+void menu_item_callback_brightness(byte button){
+  printf("menu_item_callback_brightness %d\n",button);
+  int value = menu_items[menu_item_index].value;
+  switch(button){
+    case 255:
+      value = 0;
+    break;
+    case 1:
+      value--;
+      if(value < 0)
+        value++;
+    break;
+    case 2:
+      value++;
+      if(value >= 10)
+        value--;
+    break;
+  }
+  sprintf(menu_items[menu_item_index].value_label,"%d",value);
+  menu_items[menu_item_index].value = value;
+  if(button != 255){
+    // backlight_percentage_set(value * 10);
+    int duty = 0x1fff * (value * 10 * 0.01f);
+    ledc_set_fade_with_time(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty, 1);
+    ledc_fade_start(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, LEDC_FADE_WAIT_DONE /*LEDC_FADE_NO_WAIT*/);
+  }
+};
+
+void menu_item_callback_scaling(byte button){
+  printf("menu_item_callback_scaling %d\n",button);
+  int value = menu_items[menu_item_index].value;
+  switch(button){
+    case 255:
+      value = scaling_enabled;
+    break;
+    case 1:
+      value--;
+      if(value < 0)
+        value++;
+    break;
+    case 2:
+      value++;
+      if(value >= 2)
+        value--;
+    break;
+  }
+  if(value == 0)
+    sprintf(menu_items[menu_item_index].value_label,"Off");
+  else
+    sprintf(menu_items[menu_item_index].value_label,"On");
+  menu_items[menu_item_index].value = value;
+  if(button != 255){
+    scaling_enabled = value == 0;
+  }
+};
+
+void menu_item_callback_save_state(byte button){
+  printf("menu_item_callback_save_state %d\n",button);
+  switch(button){
+    case 255:
+
+    break;
+    case 3:
+
+    break;
+  }
+};
+
+void menu_item_callback_exit(byte button){
+  printf("menu_item_callback_exit %d\n",button);
+  switch(button){
+    case 255:
+
+    break;
+    case 3:
+      // DoMenuHome();
+    break;
+  }
+};
+
+// struct menu_item menu_items[MAX_MENU_ITEMS] = {
+//   { "volume"     , "-" , 0 , &menu_item_callback_volume },
+//   { "brightness" , "-" , 0 , 0 },
+//   { "scaling"    , "-" , 0 , 0 },
+//   { "save state" , "-" , 0 , 0 },
+//   { "exit"       , "-" , 0 , 0 },
+// };
+
+
+
 odroid_gamepad_state lastJoysticState;
 odroid_gamepad_state joystick;
 
@@ -354,6 +485,94 @@ void gbaext_every_frame(){
 
   gbaext_serial_handle();
 
+  // toggle menu on volume button press
+  if (!lastJoysticState.values[ODROID_INPUT_VOLUME] && joystick.values[ODROID_INPUT_VOLUME]){
+    if(menu_visible > 0){
+      menu_visible = 0;
+    }else{
+      menu_visible = 1;
+
+      for(int i = 0; i < MAX_MENU_ITEMS; i++){
+        menu_items[i].label[0] = 0;
+        menu_items[i].value_label[0] = 0;
+        menu_items[i].value = 0;
+        menu_items[i].callback = 0;
+      }
+
+      sprintf(menu_items[0].label,"volume");
+      menu_items[0].value = 0;
+      menu_items[0].callback = &menu_item_callback_volume;
+
+      sprintf(menu_items[1].label,"brightness");
+      menu_items[1].value = 0;
+      menu_items[1].callback = &menu_item_callback_brightness;
+
+      sprintf(menu_items[2].label,"scaling");
+      menu_items[2].value = 0;
+      menu_items[2].callback = &menu_item_callback_scaling;
+
+      sprintf(menu_items[3].label,"save state");
+      menu_items[3].callback = &menu_item_callback_save_state;
+
+      sprintf(menu_items[4].label,"exit");
+      menu_items[4].callback = &menu_item_callback_exit;
+
+      for(int i = 0; i < MAX_MENU_ITEMS; i++){
+        if(menu_items[i].callback){
+          menu_item_index = i;
+          menu_items[i].callback(255);
+        }
+      }
+
+      menu_item_index = 0;
+    }
+  }
+
+  if(menu_visible){
+    // disable input to emulator if menu visible
+    pad_set(PAD_UP, 0);
+    pad_set(PAD_RIGHT, 0);
+    pad_set(PAD_DOWN, 0);
+    pad_set(PAD_LEFT, 0);
+
+    pad_set(PAD_SELECT, 0);
+    pad_set(PAD_START, 0);
+
+    pad_set(PAD_A, 0);
+    pad_set(PAD_B, 0);
+
+    if (!lastJoysticState.values[ODROID_INPUT_UP] && joystick.values[ODROID_INPUT_UP]){
+      menu_item_index--;
+      if(menu_item_index < 0)
+        menu_item_index++;
+    }
+    if (!lastJoysticState.values[ODROID_INPUT_DOWN] && joystick.values[ODROID_INPUT_DOWN]){
+      menu_item_index++;
+      if(menu_item_index >= MAX_MENU_ITEMS || !menu_items[menu_item_index].label)
+        menu_item_index--;
+    }
+
+    byte button = 0;
+    if (!lastJoysticState.values[ODROID_INPUT_LEFT] && joystick.values[ODROID_INPUT_LEFT]){
+      button = 1;
+    }
+    if (!lastJoysticState.values[ODROID_INPUT_RIGHT] && joystick.values[ODROID_INPUT_RIGHT]){
+      button = 2;
+    }
+    if (!lastJoysticState.values[ODROID_INPUT_A] && joystick.values[ODROID_INPUT_A]){
+      button = 3;
+    }
+    if (!lastJoysticState.values[ODROID_INPUT_B] && joystick.values[ODROID_INPUT_B]){
+      button = 4;
+    }
+
+    if(button && menu_items[menu_item_index].callback){
+      menu_items[menu_item_index].callback(button);
+    }
+
+  }
+
+
   // in_menu = $client.read_uint8( PokeMan::SYMBOLS_CRYSTAL[:ui_in_menu] )
   // gear_menu = $client.read_uint8( PokeMan::SYMBOLS_CRYSTAL[:ui_gear_card] )
   // menu_2 = $client.read_uint8( 0xcf71 )
@@ -463,16 +682,32 @@ void gbaext_every_second(){
 
 void gbaext_before_draw_frame(){
 
-  // set_adagfx_buffer(framebuffer,160,144);
-  // writeFillRect(0,0,80,10,0xFFFF);
-  // setCursor(2,2);
-  // setTextSize(1);
-  // setTextColor(0x0000);
-  // setTextBgColor(0xFFFF);
+  if(menu_visible){
+    set_adagfx_buffer(framebuffer,160,144);
+    writeFillRect(0,0,80,10,0xFFFF);
+    setCursor(2,2);
+    setTextSize(1);
+    setTextColor(0x0000);
+    setTextBgColor(0xFFFF);
 
-  // drawPrint("bat: ");
-  // drawPrintInt(battery_state.percentage);
-  // drawPrint("%");
+    drawPrint("bat: ");
+    drawPrintInt(battery_state.percentage);
+    drawPrint("%");
+
+    for(int i = 0; i < MAX_MENU_ITEMS; i++){
+      if(menu_items[i].label[0]){
+        setCursor(2,12 + (i * 10));
+        if(i == menu_item_index){
+          drawPrint("> ");
+        }else{
+          drawPrint("  ");
+        }
+        drawPrint(menu_items[i].label);
+        setCursor(110,12 + (i * 10));
+        drawPrint(menu_items[i].value_label);
+      }
+    }
+  }
 
 }
 
@@ -573,7 +808,6 @@ void run_to_vblank()
 uint16_t* menuFramebuffer = 0;
 
 volatile bool videoTaskIsRunning = false;
-bool scaling_enabled = true;
 bool previous_scale_enabled = true;
 
 void videoTask(void *arg)
@@ -1066,11 +1300,11 @@ void app_main(void)
         }
 
 
-        if (!lastJoysticState.values[ODROID_INPUT_VOLUME] && joystick.values[ODROID_INPUT_VOLUME])
-        {
-            odroid_audio_volume_change();
-            printf("main: Volume=%d\n", odroid_audio_volume_get());
-        }
+        // if (!lastJoysticState.values[ODROID_INPUT_VOLUME] && joystick.values[ODROID_INPUT_VOLUME])
+        // {
+        //     odroid_audio_volume_change();
+        //     printf("main: Volume=%d\n", odroid_audio_volume_get());
+        // }
 
 
         // Scaling
