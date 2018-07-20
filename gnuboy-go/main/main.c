@@ -238,6 +238,24 @@ void gbaext_serial_handler_vol(){
   printf("VOL=%d\n",vol);
 }
 
+void gbaext_serial_handler_scr(){
+  // SCR
+  printf("SCR=%d,%d,%d\n",160,144,2);
+  for(int y = 0; y < 144; y++){
+    for(int x = 0; x < 160; x++){
+      uint16_t pixel = framebuffer[ (y * 160) + x ];
+      byte low = pixel & 0xff; 
+      byte high = (pixel>>8) & 0xff;
+      // printf(low);
+      // printf(high);
+      putchar(high);
+      putchar(low);
+    }
+    // printf("\n");
+  }
+  printf("END\n");
+}
+
 
 void gbaext_init(){
 
@@ -278,6 +296,11 @@ void gbaext_serial_handle(){
       gbaext_serial_handler_vol();
     }
 
+    // SCR prefix
+    if(serial_in[0] == 'S' && serial_in[1] == 'C' && serial_in[2] == 'R'){
+      gbaext_serial_handler_scr();
+    }
+
   }
 }
 
@@ -286,7 +309,7 @@ int clock_adjust_field = 1;
 bool clock_adjust_mode_just_changed = false;
 void gbaext_every_frame(){
 
-  // gbaext_serial_handle();
+  gbaext_serial_handle();
 
   // in_menu = $client.read_uint8( PokeMan::SYMBOLS_CRYSTAL[:ui_in_menu] )
   // gear_menu = $client.read_uint8( PokeMan::SYMBOLS_CRYSTAL[:ui_gear_card] )
@@ -397,16 +420,16 @@ void gbaext_every_second(){
 
 void gbaext_before_draw_frame(){
 
-  set_adagfx_buffer(framebuffer,160,144);
-  writeFillRect(0,0,80,10,0xFFFF);
-  setCursor(2,2);
-  setTextSize(1);
-  setTextColor(0x0000);
-  setTextBgColor(0xFFFF);
+  // set_adagfx_buffer(framebuffer,160,144);
+  // writeFillRect(0,0,80,10,0xFFFF);
+  // setCursor(2,2);
+  // setTextSize(1);
+  // setTextColor(0x0000);
+  // setTextBgColor(0xFFFF);
 
-  drawPrint("bat: ");
-  drawPrintInt(battery_state.percentage);
-  drawPrint("%");
+  // drawPrint("bat: ");
+  // drawPrintInt(battery_state.percentage);
+  // drawPrint("%");
 
 }
 
