@@ -344,6 +344,9 @@ int textsize = 0;
 uint16_t textcolor = 0x0000;
 uint16_t textbgcolor = 0xFFFF;
 
+bool outline = false;
+uint16_t textoutlinecolor = 0xFFFF;
+
 void writePixel(uint16_t x, uint16_t y, uint16_t color) {
   // adagfx_buffer[ (y * adagfx_width) + x - 1 ] = color;
   // printf("writePixel addr: %d + %d\n",(int)adagfx_buffer,(y * adagfx_width) + x);
@@ -461,6 +464,17 @@ size_t drawWrite(uint8_t c) {
           cursor_x  = 0;                 // Reset x to zero,
           cursor_y += textsize * 8;      // advance y one line
       }
+      if(outline){
+        drawChar(cursor_x - 1, cursor_y - 1, c, textoutlinecolor, textoutlinecolor, textsize);         
+        drawChar(cursor_x - 0, cursor_y - 1, c, textoutlinecolor, textoutlinecolor, textsize);         
+        drawChar(cursor_x + 1, cursor_y - 1, c, textoutlinecolor, textoutlinecolor, textsize);         
+        drawChar(cursor_x - 1, cursor_y - 0, c, textoutlinecolor, textoutlinecolor, textsize);         
+        drawChar(cursor_x - 0, cursor_y - 0, c, textoutlinecolor, textoutlinecolor, textsize);         
+        drawChar(cursor_x + 1, cursor_y - 0, c, textoutlinecolor, textoutlinecolor, textsize);         
+        drawChar(cursor_x - 1, cursor_y + 1, c, textoutlinecolor, textoutlinecolor, textsize);         
+        drawChar(cursor_x - 0, cursor_y + 1, c, textoutlinecolor, textoutlinecolor, textsize);         
+        drawChar(cursor_x + 1, cursor_y + 1, c, textoutlinecolor, textoutlinecolor, textsize);         
+      }
       drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
       // drawChar(cursor_x, cursor_y, c, textcolor, textbgcolor, textsize);
       cursor_x += textsize * 6;          // Advance x one char
@@ -516,4 +530,11 @@ void setTextColor(uint16_t val){
 
 void setTextBgColor(uint16_t val){
   textbgcolor = val;
+}
+
+void setOutline(bool val){
+  outline = val;
+}
+void setOutlineColor(uint16_t val){
+  textoutlinecolor = val;
 }

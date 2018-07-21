@@ -94,7 +94,7 @@ static void SaveState()
         char* fileName = odroid_util_GetFileName(romPath);
         if (!fileName) abort();
 
-        char fileNameTagged[64];
+        char fileNameTagged[512];
         sprintf(fileNameTagged,"%s.latest.gbc",fileName);
 
         char* pathName = odroid_sdcard_create_savefile_path(SD_BASE_PATH, fileNameTagged);
@@ -213,6 +213,8 @@ int menu_draw_bg_h = 144;
 uint16_t menu_draw_text_color = 0x0000;
 
 typedef void (*menu_item_callback)(byte);
+
+menu_item_callback menu_tick_callback = 0;
 
 typedef struct menu_item {
   char label[16];
@@ -458,17 +460,25 @@ void menu_init_1(){
   previous_menu_id = 0;
 };
 
+void menu_2_tick(byte button){
+  menu_draw_text_color = 0xf000;
+};
+
 void menu_init_2(){
   add_menu_item_value("RTC Carry",0,&menu_item_callback_rtc_c);
   add_menu_item_value("RTC Day",0,&menu_item_callback_rtc_d);
   add_menu_item_value("RTC Hour",0,&menu_item_callback_rtc_h);
   add_menu_item_value("RTC Minute",0,&menu_item_callback_rtc_m);
 
+  menu_tick_callback = menu_2_tick;
+
   previous_menu_id = 1;
 };
 
 void show_menu(byte menu_id){
   menu_visible = menu_id;
+
+  menu_tick_callback = 0;
 
   menu_exit_on_b = true;
   menu_draw_x_label = 2;
@@ -787,6 +797,12 @@ void gbaext_every_frame(){
 
   gbaext_serial_handle();
 
+  if(menu_visible){
+    if(menu_tick_callback){
+      menu_tick_callback(menu_visible);
+    }
+  }
+
   // toggle menu on volume button press
   if (!lastJoysticState.values[ODROID_INPUT_VOLUME] && joystick.values[ODROID_INPUT_VOLUME]){
     if(menu_visible > 0){
@@ -1006,11 +1022,13 @@ void gbaext_before_draw_frame(){
   if(menu_visible){
     set_adagfx_buffer(framebuffer,160,144);
 
-    writeFillRect(menu_draw_bg_x,menu_draw_bg_y,menu_draw_bg_w,menu_draw_bg_h,menu_draw_bg_color);
+    // writeFillRect(menu_draw_bg_x,menu_draw_bg_y,menu_draw_bg_w,menu_draw_bg_h,menu_draw_bg_color);
 
     setTextSize(1);
     setTextColor(menu_draw_text_color);
     setTextBgColor(menu_draw_text_color);
+    setOutline(true);
+    setOutlineColor(menu_draw_bg_color);
 
     // setCursor(2,1);
     // drawPrint("bat memfree fps frame ____");
