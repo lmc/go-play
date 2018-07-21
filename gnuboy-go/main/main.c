@@ -196,6 +196,8 @@ bool scaling_enabled = true;
 
 
 byte menu_visible = 0;
+byte previous_menu_id = 0;
+bool menu_exit_on_b = true;
 int menu_item_index = 0;
 
 typedef void (*menu_item_callback)(byte);
@@ -211,6 +213,26 @@ typedef struct menu_item {
 byte max_menu_items = MAX_MENU_ITEMS;
 struct menu_item menu_items[MAX_MENU_ITEMS] = {};
 
+int value_incr(int value, int min, int max, bool wrap){
+  value++;
+  if(value >= max){
+    if(wrap)
+      value = min;
+    else
+      value = max - 1;
+  }
+  return value;
+};
+int value_decr(int value, int min, int max, bool wrap){
+  value--;
+  if(value < min){
+    if(wrap)
+      value = max - 1;
+    else
+      value = min;
+  }
+  return value;
+};
 void menu_item_callback_volume(byte button){
   printf("menu_item_callback_volume %d\n",button);
   int value = menu_items[menu_item_index].value;
@@ -219,14 +241,16 @@ void menu_item_callback_volume(byte button){
       value = odroid_audio_volume_get();
     break;
     case 1:
-      value--;
-      if(value < 0)
-        value++;
+      value = value_decr(value,0,ODROID_VOLUME_LEVEL_COUNT,true);
+      // value--;
+      // if(value < 0)
+      //   value++;
     break;
     case 2:
-      value++;
-      if(value >= ODROID_VOLUME_LEVEL_COUNT)
-        value--;
+      value = value_incr(value,0,ODROID_VOLUME_LEVEL_COUNT,true);
+      // value++;
+      // if(value >= ODROID_VOLUME_LEVEL_COUNT)
+      //   value--;
     break;
   }
   sprintf(menu_items[menu_item_index].value_label,"%d",value);
@@ -405,6 +429,7 @@ byte add_menu_item_value(const char* label, int value, menu_item_callback callba
 
 void show_menu(byte menu_id){
   menu_visible = menu_id;
+  menu_exit_on_b = true;
 
   for(int i = 0; i < MAX_MENU_ITEMS; i++){
     menu_items[i].label[0] = 0;
@@ -432,6 +457,8 @@ void show_menu(byte menu_id){
       add_menu_item("1",0);
       add_menu_item("2",0);
       add_menu_item("3",0);
+
+      previous_menu_id = 0;
     break;
   }
 
@@ -820,8 +847,19 @@ void gbaext_every_frame(){
       button = 4;
     }
 
-    if(button && menu_items[menu_item_index].callback){
-      menu_items[menu_item_index].callback(button);
+    if(button){
+
+      if(menu_items[menu_item_index].callback){
+        menu_items[menu_item_index].callback(button);
+      }
+
+      if(button == 4 && menu_exit_on_b){
+        if(previous_menu_id)
+          show_menu(previous_menu_id);
+        else
+          hide_menu();
+      }
+
     }
 
   }
@@ -938,7 +976,9 @@ void gbaext_before_draw_frame(){
 
   if(menu_visible){
     set_adagfx_buffer(framebuffer,160,144);
-    // writeFillRect(0,0,80,10,0xFFFF);
+
+    writeFillRect(0,0,160,144,0xFFFF);
+
     setTextSize(1);
     setTextColor(0x0000);
     setTextBgColor(0xFFFF);
@@ -954,7 +994,7 @@ void gbaext_before_draw_frame(){
     drawPrint(" ");
 
     // drawPrint("free: ");
-    drawPrintFloat( (float)esp_get_free_heap_size() / 1024.0 );
+    drawPrintFloat( (float)esp_get_free_heap_size() / 1024.0 , 2 );
     drawPrint("kb");
 
     drawPrint(" ");
@@ -964,7 +1004,9 @@ void gbaext_before_draw_frame(){
       float seconds = totalElapsedTime / (CONFIG_ESP32_DEFAULT_CPU_FREQ_MHZ * 1000000.0f); // 240000000.0f; // (240Mhz)
       vfps = actualFrameCount / seconds;
     // }
-    drawPrintFloat( vfps );
+    drawPrintFloat( vfps , 0 );
+    // int ifps = (int)vfps;
+    // drawPrintInt( ifps );
     // drawPrint("fps");
 
 

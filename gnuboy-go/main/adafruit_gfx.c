@@ -482,9 +482,15 @@ void drawPrintInt(int i){
   }
 }
 
-void drawPrintFloat(double i){
+void drawPrintFloat(double i, int precision){
   char str[10];
-  sprintf(str, "%.02f", i);
+  if(precision == 2){
+    sprintf(str, "%.02f", i);
+  }else if(precision == 1){
+    sprintf(str, "%.1f", i);
+  }else{
+    sprintf(str, "%.0f", i);
+  }
   for(int i = 0; str[i] != '\0'; i++) {
     drawWrite(str[i]);
   }
