@@ -482,6 +482,14 @@ void drawPrintInt(int i){
   }
 }
 
+void drawPrintFloat(double i){
+  char str[10];
+  sprintf(str, "%.02f", i);
+  for(int i = 0; str[i] != '\0'; i++) {
+    drawWrite(str[i]);
+  }
+};
+
 
 void setTextSize(uint8_t s) {
     textsize = (s > 0) ? s : 1;
