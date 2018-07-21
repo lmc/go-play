@@ -200,6 +200,18 @@ byte previous_menu_id = 0;
 bool menu_exit_on_b = true;
 int menu_item_index = 0;
 
+int menu_draw_x_label = 0;
+int menu_draw_x_value = 110;
+int menu_draw_y = 0;
+byte menu_draw_row_height = 10;
+uint16_t menu_draw_bg_color = 0xFFFF;
+int menu_draw_bg_x = 0;
+int menu_draw_bg_y = 0;
+int menu_draw_bg_w = 160;
+int menu_draw_bg_h = 144;
+
+uint16_t menu_draw_text_color = 0x0000;
+
 typedef void (*menu_item_callback)(byte);
 
 typedef struct menu_item {
@@ -215,11 +227,11 @@ struct menu_item menu_items[MAX_MENU_ITEMS] = {};
 
 int value_incr(int value, int min, int max, bool wrap){
   value++;
-  if(value >= max){
+  if(value > max){
     if(wrap)
       value = min;
     else
-      value = max - 1;
+      value = max;
   }
   return value;
 };
@@ -227,7 +239,7 @@ int value_decr(int value, int min, int max, bool wrap){
   value--;
   if(value < min){
     if(wrap)
-      value = max - 1;
+      value = max;
     else
       value = min;
   }
@@ -241,16 +253,10 @@ void menu_item_callback_volume(byte button){
       value = odroid_audio_volume_get();
     break;
     case 1:
-      value = value_decr(value,0,ODROID_VOLUME_LEVEL_COUNT,true);
-      // value--;
-      // if(value < 0)
-      //   value++;
+      value = value_decr(value,0,ODROID_VOLUME_LEVEL_COUNT - 1,false);
     break;
     case 2:
-      value = value_incr(value,0,ODROID_VOLUME_LEVEL_COUNT,true);
-      // value++;
-      // if(value >= ODROID_VOLUME_LEVEL_COUNT)
-      //   value--;
+      value = value_incr(value,0,ODROID_VOLUME_LEVEL_COUNT - 1,false);
     break;
   }
   sprintf(menu_items[menu_item_index].value_label,"%d",value);
@@ -268,14 +274,10 @@ void menu_item_callback_brightness(byte button){
       value = 0;
     break;
     case 1:
-      value--;
-      if(value < 0)
-        value++;
+      value = value_decr(value,0,9,false);
     break;
     case 2:
-      value++;
-      if(value >= 10)
-        value--;
+      value = value_incr(value,0,9,false);
     break;
   }
   sprintf(menu_items[menu_item_index].value_label,"%d",value);
@@ -296,20 +298,13 @@ void menu_item_callback_scaling(byte button){
       value = scaling_enabled;
     break;
     case 1:
-      value--;
-      if(value < 0)
-        value++;
+      value = value_decr(value,0,1,false);
     break;
     case 2:
-      value++;
-      if(value >= 2)
-        value--;
+      value = value_incr(value,0,1,false);
     break;
   }
-  if(value == 0)
-    sprintf(menu_items[menu_item_index].value_label,"Off");
-  else
-    sprintf(menu_items[menu_item_index].value_label,"On");
+  sprintf(menu_items[menu_item_index].value_label, value ? "On" : "Off");
   menu_items[menu_item_index].value = value;
   if(button != 255){
     scaling_enabled = value != 0;
@@ -337,34 +332,40 @@ void menu_item_callback_rtc(byte m, byte button){
       }
     break;
     case 1:
-      value--;
-      if(value < 0)
-        value = 0;
-    break;
-    case 2:
-      value++;
       switch(m){
         case 0:
-          if(value > 1)
-            value = 1;
+          value = value_decr(value,0,1,false);
         break;
         case 1:
-          if(value > 364)
-            value = 364;
+          value = value_decr(value,0,364,false);
         break;
         case 2:
-          if(value > 23)
-            value = 23;
+          value = value_decr(value,0,23,true);
+        break;
         case 3:
-          if(value > 59)
-            value = 59;
+          value = value_decr(value,0,59,true);
+        break;
+      }
+    break;
+    case 2:
+      switch(m){
+        case 0:
+          value = value_incr(value,0,1,false);
+        break;
+        case 1:
+          value = value_incr(value,0,364,false);
+        break;
+        case 2:
+          value = value_incr(value,0,23,true);
+        break;
+        case 3:
+          value = value_incr(value,0,59,true);
         break;
       }
     break;
   }
   menu_items[menu_item_index].value = value;
   sprintf(menu_items[menu_item_index].value_label,"%d",value);
-
 }
 
 void menu_item_callback_rtc_c(byte button){
@@ -429,7 +430,18 @@ byte add_menu_item_value(const char* label, int value, menu_item_callback callba
 
 void show_menu(byte menu_id){
   menu_visible = menu_id;
+
   menu_exit_on_b = true;
+  menu_draw_x_label = 2;
+  menu_draw_x_value = 110;
+  menu_draw_y = 14;
+  menu_draw_row_height = 10;
+  menu_draw_bg_color = 0x0000;
+  menu_draw_bg_x = 2;
+  menu_draw_bg_y = 13;
+  menu_draw_bg_w = 160;
+  menu_draw_bg_h = 90;
+  menu_draw_text_color = 0xffff;
 
   for(int i = 0; i < MAX_MENU_ITEMS; i++){
     menu_items[i].label[0] = 0;
@@ -454,21 +466,11 @@ void show_menu(byte menu_id){
       add_menu_item("Save State",&menu_item_callback_save_state);
       add_menu_item("Exit Emulator",&menu_item_callback_exit);
 
-      add_menu_item("1",0);
-      add_menu_item("2",0);
-      add_menu_item("3",0);
-
       previous_menu_id = 0;
     break;
   }
 
-  // for(int i = 0; i < MAX_MENU_ITEMS; i++){
-  //   if(menu_items[i].callback){
-  //     menu_item_index = i;
-  //     menu_items[i].callback(255);
-  //   }
-  // }
-
+  max_menu_items = menu_item_index;
   menu_item_index = 0;
 };
 
@@ -476,15 +478,6 @@ void hide_menu(){
   menu_visible = 0;
   menu_item_index = 0;
 }
-
-// struct menu_item menu_items[MAX_MENU_ITEMS] = {
-//   { "volume"     , "-" , 0 , &menu_item_callback_volume },
-//   { "brightness" , "-" , 0 , 0 },
-//   { "scaling"    , "-" , 0 , 0 },
-//   { "save state" , "-" , 0 , 0 },
-//   { "exit"       , "-" , 0 , 0 },
-// };
-
 
 uint startTime;
 uint stopTime;
@@ -829,7 +822,7 @@ void gbaext_every_frame(){
     }
     if (!lastJoysticState.values[ODROID_INPUT_DOWN] && joystick.values[ODROID_INPUT_DOWN]){
       menu_item_index++;
-      if(menu_item_index >= MAX_MENU_ITEMS || !menu_items[menu_item_index].label)
+      if(menu_item_index >= MAX_MENU_ITEMS || menu_item_index >= max_menu_items || !menu_items[menu_item_index].label[0])
         menu_item_index--;
     }
 
@@ -854,6 +847,12 @@ void gbaext_every_frame(){
       }
 
       if(button == 4 && menu_exit_on_b){
+        // if we're exiting a menu, send the B event to all items
+        for(menu_item_index = 0; menu_item_index < MAX_MENU_ITEMS; menu_item_index++){
+          if(menu_items[menu_item_index].callback){
+            menu_items[menu_item_index].callback(button);
+          }
+        }
         if(previous_menu_id)
           show_menu(previous_menu_id);
         else
@@ -977,53 +976,44 @@ void gbaext_before_draw_frame(){
   if(menu_visible){
     set_adagfx_buffer(framebuffer,160,144);
 
-    writeFillRect(0,0,160,144,0xFFFF);
+    writeFillRect(menu_draw_bg_x,menu_draw_bg_y,menu_draw_bg_w,menu_draw_bg_h,menu_draw_bg_color);
 
     setTextSize(1);
-    setTextColor(0x0000);
-    setTextBgColor(0xFFFF);
+    setTextColor(menu_draw_text_color);
+    setTextBgColor(menu_draw_text_color);
 
-    setCursor(1,1);
-    drawPrint("bat memfree fps");
+    // setCursor(2,1);
+    // drawPrint("bat memfree fps frame ____");
 
-    setCursor(1,11);
-    // drawPrint("bat: ");
-    drawPrintInt(battery_state.percentage);
-    drawPrint("%");
+    setCursor(2,1);
 
-    drawPrint(" ");
+    int bat = battery_state.percentage;
+    if(bat > 99) bat = 99;
+    drawPrintInt(bat);
+    drawPrint("% ");
 
-    // drawPrint("free: ");
     drawPrintFloat( (float)esp_get_free_heap_size() / 1024.0 , 2 );
-    drawPrint("kb");
+    drawPrint("kb ");
 
-    drawPrint(" ");
-
-    // if (actualFrameCount == 60)
-    // {
-      float seconds = totalElapsedTime / (CONFIG_ESP32_DEFAULT_CPU_FREQ_MHZ * 1000000.0f); // 240000000.0f; // (240Mhz)
-      vfps = actualFrameCount / seconds;
-    // }
+    float seconds = totalElapsedTime / (CONFIG_ESP32_DEFAULT_CPU_FREQ_MHZ * 1000000.0f); // 240000000.0f; // (240Mhz)
+    vfps = actualFrameCount / seconds;
     drawPrintFloat( vfps , 0 );
-    // int ifps = (int)vfps;
-    // drawPrintInt( ifps );
-    // drawPrint("fps");
 
+    drawPrint("  ");
 
-
-    // drawPrint(" fps: ");
-    // drawPrintInt( );
+    drawPrintInt( elapsedTime / (CONFIG_ESP32_DEFAULT_CPU_FREQ_MHZ * 1000) );
+    drawPrint("ms");
 
     for(int i = 0; i < MAX_MENU_ITEMS; i++){
       if(menu_items[i].label[0]){
-        setCursor(1,21 + (i * 10));
+        setCursor(menu_draw_x_label,menu_draw_y + (i * menu_draw_row_height));
         if(i == menu_item_index){
           drawPrint("> ");
         }else{
           drawPrint("  ");
         }
         drawPrint(menu_items[i].label);
-        setCursor(110,21 + (i * 10));
+        setCursor(menu_draw_x_value,menu_draw_y + (i * menu_draw_row_height));
         drawPrint(menu_items[i].value_label);
       }
     }
