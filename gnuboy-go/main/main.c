@@ -911,7 +911,65 @@ static void SaveState()
         char* fileName = odroid_util_GetFileName(romPath);
         if (!fileName) abort();
 
-        char* pathName = odroid_sdcard_create_savefile_path(SD_BASE_PATH, fileName);
+        char fileNameTagged[64];
+        sprintf(fileNameTagged,"%s.latest.gbc",fileName);
+
+        char* pathName = odroid_sdcard_create_savefile_path(SD_BASE_PATH, fileNameTagged);
+        if (!pathName) abort();
+
+        FILE* f = fopen(pathName, "w");
+        if (f == NULL)
+        {
+            printf("%s: fopen save failed\n", __func__);
+            abort();
+        }
+
+        savestate(f);
+        fclose(f);
+
+        printf("%s: savestate OK.\n", __func__);
+
+        free(pathName);
+        free(fileName);
+        free(romPath);
+    }
+    else
+    {
+        FILE* f = fopen(StateFileName, "w");
+        if (f == NULL)
+        {
+            printf("SaveState: fopen save failed\n");
+        }
+        else
+        {
+            savestate(f);
+            fclose(f);
+
+            printf("SaveState: savestate OK.\n");
+        }
+    }
+
+
+    odroid_system_led_set(0);
+    odroid_input_battery_monitor_enabled_set(1);
+}
+
+static void SaveStateRtc()
+{
+    // Save sram
+    odroid_input_battery_monitor_enabled_set(0);
+    odroid_system_led_set(1);
+
+    char* romPath = odroid_settings_RomFilePath_get();
+    if (romPath)
+    {
+        char* fileName = odroid_util_GetFileName(romPath);
+        if (!fileName) abort();
+
+        char fileNameTagged[64];
+        sprintf(fileNameTagged,"%s.%03dd%02dh%02dm%02ds.gbc",fileName,rtc.d,rtc.h,rtc.m,rtc.s);
+
+        char* pathName = odroid_sdcard_create_savefile_path(SD_BASE_PATH, fileNameTagged);
         if (!pathName) abort();
 
         FILE* f = fopen(pathName, "w");
@@ -959,7 +1017,10 @@ static void LoadState(const char* cartName)
         char* fileName = odroid_util_GetFileName(romName);
         if (!fileName) abort();
 
-        char* pathName = odroid_sdcard_create_savefile_path(SD_BASE_PATH, fileName);
+        char fileNameTagged[64];
+        sprintf(fileNameTagged,"%s.latest.gbc",fileName);
+
+        char* pathName = odroid_sdcard_create_savefile_path(SD_BASE_PATH, fileNameTagged);
         if (!pathName) abort();
 
         FILE* f = fopen(pathName, "r");
@@ -1030,6 +1091,7 @@ static void PowerDown()
     // state
     printf("PowerDown: Saving state.\n");
     SaveState();
+    SaveStateRtc();
 
     // LCD
     printf("PowerDown: Powerdown LCD panel.\n");
@@ -1064,6 +1126,7 @@ static void DoMenuHome()
     // state
     printf("PowerDown: Saving state.\n");
     SaveState();
+    SaveStateRtc();
 
 
     // Set menu application
@@ -1195,13 +1258,13 @@ void app_main(void)
     // vid_begin
     memset(&fb, 0, sizeof(fb));
     fb.w = 160;
-  	fb.h = 144;
-  	fb.pelsize = 2;
-  	fb.pitch = fb.w * fb.pelsize;
-  	fb.indexed = 0;
-  	fb.ptr = framebuffer;
-  	fb.enabled = 1;
-  	fb.dirty = 0;
+    fb.h = 144;
+    fb.pelsize = 2;
+    fb.pitch = fb.w * fb.pelsize;
+    fb.indexed = 0;
+    fb.ptr = framebuffer;
+    fb.enabled = 1;
+    fb.dirty = 0;
 
 
     // Note: Magic number obtained by adjusting until audio buffer overflows stop.
@@ -1212,10 +1275,10 @@ void app_main(void)
     // pcm.len = count of 16bit samples (x2 for stereo)
     memset(&pcm, 0, sizeof(pcm));
     pcm.hz = AUDIO_SAMPLE_RATE;
-  	pcm.stereo = 1;
-  	pcm.len = /*pcm.hz / 2*/ audioBufferLength;
-  	pcm.buf = heap_caps_malloc(AUDIO_BUFFER_SIZE, MALLOC_CAP_8BIT | MALLOC_CAP_DMA);
-  	pcm.pos = 0;
+    pcm.stereo = 1;
+    pcm.len = /*pcm.hz / 2*/ audioBufferLength;
+    pcm.buf = heap_caps_malloc(AUDIO_BUFFER_SIZE, MALLOC_CAP_8BIT | MALLOC_CAP_DMA);
+    pcm.pos = 0;
 
     audioBuffer[0] = pcm.buf;
     audioBuffer[1] = heap_caps_malloc(AUDIO_BUFFER_SIZE, MALLOC_CAP_8BIT | MALLOC_CAP_DMA);
