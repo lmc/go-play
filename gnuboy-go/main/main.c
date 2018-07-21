@@ -224,6 +224,7 @@ typedef struct menu_item {
 #define MAX_MENU_ITEMS 12
 byte max_menu_items = MAX_MENU_ITEMS;
 struct menu_item menu_items[MAX_MENU_ITEMS] = {};
+void show_menu(byte menu_id);
 
 int value_incr(int value, int min, int max, bool wrap){
   value++;
@@ -245,6 +246,15 @@ int value_decr(int value, int min, int max, bool wrap){
   }
   return value;
 };
+
+void menu_item_callback_submenu(byte button){
+  switch(button){
+    case 3:
+      show_menu( menu_items[menu_item_index].value );
+    break;
+  }
+};
+
 void menu_item_callback_volume(byte button){
   printf("menu_item_callback_volume %d\n",button);
   int value = menu_items[menu_item_index].value;
@@ -426,7 +436,36 @@ byte add_menu_item_value(const char* label, int value, menu_item_callback callba
   menu_item_index++;
   return i;
 };
+byte add_menu_item_submenu(const char* label, int value){
+  return add_menu_item_value(label,value,&menu_item_callback_submenu);
+};
 
+
+void menu_init_1(){
+  add_menu_item_value("Volume",0,&menu_item_callback_volume);
+  add_menu_item_value("Brightness",0,&menu_item_callback_brightness);
+  add_menu_item_value("Scaling",0,&menu_item_callback_scaling);
+
+  // add_menu_item_value("RTC Carry",0,&menu_item_callback_rtc_c);
+  // add_menu_item_value("RTC Day",0,&menu_item_callback_rtc_d);
+  // add_menu_item_value("RTC Hour",0,&menu_item_callback_rtc_h);
+  // add_menu_item_value("RTC Minute",0,&menu_item_callback_rtc_m);
+  add_menu_item_submenu("RTC",2);
+
+  add_menu_item("Save State",&menu_item_callback_save_state);
+  add_menu_item("Exit Emulator",&menu_item_callback_exit);
+
+  previous_menu_id = 0;
+};
+
+void menu_init_2(){
+  add_menu_item_value("RTC Carry",0,&menu_item_callback_rtc_c);
+  add_menu_item_value("RTC Day",0,&menu_item_callback_rtc_d);
+  add_menu_item_value("RTC Hour",0,&menu_item_callback_rtc_h);
+  add_menu_item_value("RTC Minute",0,&menu_item_callback_rtc_m);
+
+  previous_menu_id = 1;
+};
 
 void show_menu(byte menu_id){
   menu_visible = menu_id;
@@ -454,19 +493,10 @@ void show_menu(byte menu_id){
   int i = 1;
   switch(menu_id){
     case 1:
-      add_menu_item_value("Volume",0,&menu_item_callback_volume);
-      add_menu_item_value("Brightness",0,&menu_item_callback_brightness);
-      add_menu_item_value("Scaling",0,&menu_item_callback_scaling);
-
-      add_menu_item_value("RTC Carry",0,&menu_item_callback_rtc_c);
-      add_menu_item_value("RTC Day",0,&menu_item_callback_rtc_d);
-      add_menu_item_value("RTC Hour",0,&menu_item_callback_rtc_h);
-      add_menu_item_value("RTC Minute",0,&menu_item_callback_rtc_m);
-
-      add_menu_item("Save State",&menu_item_callback_save_state);
-      add_menu_item("Exit Emulator",&menu_item_callback_exit);
-
-      previous_menu_id = 0;
+      menu_init_1();
+    break;
+    case 2:
+      menu_init_2();
     break;
   }
 
