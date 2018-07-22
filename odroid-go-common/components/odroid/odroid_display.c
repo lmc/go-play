@@ -433,7 +433,35 @@ void ili9341_write_frame_gb(uint16_t* buffer, int scale)
     {
         uint16_t* framePtr = buffer;
 
-        if (scale)
+        if (scale == 2){
+          send_reset_drawing(0,0,320,240);
+          uint8_t alt = 0;
+          // for (y = 0; y < GAMEBOY_HEIGHT; y += 1)
+          for (y = 0; y < 120; y += 1)
+          {
+            int linesWritten = 0;
+            for (int i = 0; i < 2; ++i)
+            {
+              int index = i * 320;
+              int bufferIndex = y * GAMEBOY_WIDTH;
+              for (x = 0; x < GAMEBOY_WIDTH; ++x)
+              {
+                uint16_t sample = framePtr[bufferIndex++];
+                uint16_t sample2 = ((sample >> 8) | ((sample & 0xff) << 8));
+                line[alt][index++] = sample2;
+                line[alt][index++] = sample2;
+              }
+              ++linesWritten;
+            }
+            send_continue_line(line[alt], 320, linesWritten);
+            // swap buffers
+            if (alt)
+                alt = 0;
+            else
+                alt = 1;
+          }
+
+        }else  if (scale == 1)
         {
             // NOTE: LINE_COUNT must be 3 or greater
             const short outputWidth = 265;

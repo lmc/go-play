@@ -192,7 +192,7 @@ static void SaveStateRtc()
     odroid_input_battery_monitor_enabled_set(1);
 }
 
-bool scaling_enabled = true;
+int scaling_enabled = 1;
 
 
 byte menu_visible = 0;
@@ -311,16 +311,16 @@ void menu_item_callback_scaling(byte button){
       value = scaling_enabled;
     break;
     case 1:
-      value = value_decr(value,0,1,false);
+      value = value_decr(value,0,2,false);
     break;
     case 2:
-      value = value_incr(value,0,1,false);
+      value = value_incr(value,0,2,false);
     break;
   }
-  sprintf(menu_items[menu_item_index].value_label, value ? "On" : "Off");
+  sprintf(menu_items[menu_item_index].value_label, "%d", value);
   menu_items[menu_item_index].value = value;
   if(button != 255){
-    scaling_enabled = value != 0;
+    scaling_enabled = value;
   }
 };
 
@@ -1261,7 +1261,7 @@ void run_to_vblank()
 uint16_t* menuFramebuffer = 0;
 
 volatile bool videoTaskIsRunning = false;
-bool previous_scale_enabled = true;
+int previous_scale_enabled = 1;
 
 void videoTask(void *arg)
 {
@@ -1280,7 +1280,7 @@ void videoTask(void *arg)
         if (previous_scale_enabled != scaling_enabled)
         {
             // Clear display
-            ili9341_write_frame_gb(NULL, true);
+            ili9341_write_frame_gb(NULL, 1);
             previous_scale_enabled = scaling_enabled;
         }
 
@@ -1716,10 +1716,10 @@ void app_main(void)
 
 
         // Scaling
-        if (joystick.values[ODROID_INPUT_START] && !lastJoysticState.values[ODROID_INPUT_RIGHT] && joystick.values[ODROID_INPUT_RIGHT])
-        {
-            scaling_enabled = !scaling_enabled;
-        }
+        // if (joystick.values[ODROID_INPUT_START] && !lastJoysticState.values[ODROID_INPUT_RIGHT] && joystick.values[ODROID_INPUT_RIGHT])
+        // {
+        //     scaling_enabled = !scaling_enabled;
+        // }
 
         pad_set(PAD_UP, joystick.values[ODROID_INPUT_UP]);
         pad_set(PAD_RIGHT, joystick.values[ODROID_INPUT_RIGHT]);
