@@ -408,7 +408,7 @@ static uint16_t Blend(uint16_t a, uint16_t b)
   return (rv << 11) | (gv << 5) | (bv);
 }
 
-void ili9341_write_frame_gb(uint16_t* buffer, int scale)
+void ili9341_write_frame_gb(uint16_t* buffer, int scale, char* line_mask)
 {
     short x, y;
 
@@ -433,14 +433,17 @@ void ili9341_write_frame_gb(uint16_t* buffer, int scale)
     {
         uint16_t* framePtr = buffer;
 
-        if (scale == 2){
+        if (scale >= 2){
           send_reset_drawing(0,0,320,240);
           uint8_t alt = 0;
           // for (y = 0; y < GAMEBOY_HEIGHT; y += 1)
-          for (y = 0; y < 120; y += 1)
+          int linesWrittenTotal = 0;
+          for (y = 0; y < GAMEBOY_HEIGHT; y += 1)
           {
+            if(linesWrittenTotal >= 240) break;
+            if(line_mask[y] == 0) continue;
             int linesWritten = 0;
-            for (int i = 0; i < 2; ++i)
+            for (int i = 0; i < line_mask[y]; ++i)
             {
               int index = i * 320;
               int bufferIndex = y * GAMEBOY_WIDTH;
@@ -454,11 +457,8 @@ void ili9341_write_frame_gb(uint16_t* buffer, int scale)
               ++linesWritten;
             }
             send_continue_line(line[alt], 320, linesWritten);
-            // swap buffers
-            if (alt)
-                alt = 0;
-            else
-                alt = 1;
+            linesWrittenTotal += linesWritten;
+            alt = alt ? 0 : 1;
           }
 
         }else  if (scale == 1)

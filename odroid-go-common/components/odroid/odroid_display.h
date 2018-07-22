@@ -7,7 +7,7 @@ enum ODROID_SD_ERR {
     ODROID_SD_ERR_NOCARD = 0x02
 };
 
-void ili9341_write_frame_gb(uint16_t* buffer, int scale);
+void ili9341_write_frame_gb(uint16_t* buffer, int scale, char* line_mask);
 void ili9341_init();
 void ili9341_poweroff();
 void ili9341_prepare();

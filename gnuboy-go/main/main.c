@@ -193,6 +193,20 @@ static void SaveStateRtc()
 }
 
 int scaling_enabled = 1;
+byte scaling_line_mask[GAMEBOY_HEIGHT];
+
+void scaling_line_mask_reset(){
+  for(int i = 0; i < GAMEBOY_HEIGHT; i++)
+    scaling_line_mask[i] = 2;
+};
+void scaling_line_mask_skip(int row, int size){
+  for(int i = 0; i < size; i++)
+    scaling_line_mask[row + i] = 0;
+};
+void scaling_line_mask_squish(int row, int size){
+  for(int i = 0; i < size; i++)
+    scaling_line_mask[row + i] = 1;
+};
 
 
 byte menu_visible = 0;
@@ -311,15 +325,41 @@ void menu_item_callback_scaling(byte button){
       value = scaling_enabled;
     break;
     case 1:
-      value = value_decr(value,0,2,false);
+      value = value_decr(value,0,3,false);
     break;
     case 2:
-      value = value_incr(value,0,2,false);
+      value = value_incr(value,0,3,false);
     break;
   }
   sprintf(menu_items[menu_item_index].value_label, "%d", value);
   menu_items[menu_item_index].value = value;
   if(button != 255){
+    if(value == 2){
+      scaling_line_mask_reset();
+      // suitable for map mode + most menus
+      scaling_line_mask_skip(0,15);
+      scaling_line_mask_skip(144-9,9);
+    }else if(value == 3){
+      scaling_line_mask_reset();
+      // battle mode
+      // scaling_line_mask_skip(96,2);
+      scaling_line_mask_skip(96,6);
+      scaling_line_mask_skip(144-8,8);
+      // scaling_line_mask_squish(144-1-8-32,32);
+      // scaling_line_mask_squish(8,2);
+      scaling_line_mask_squish(32,20);
+
+
+
+      // scaling_line_mask_skip(0,8);
+      // scaling_line_mask_squish(8,8);
+      // scaling_line_mask_skip(144-8,8);
+      // scaling_line_mask_squish(144-16,8);
+
+      // DO NOT USE : creates sickening "cylinder world" effect
+      // scaling_line_mask_squish(0,24);
+      // scaling_line_mask_squish(144-1-24,24);
+    }
     scaling_enabled = value;
   }
 };
@@ -1280,13 +1320,13 @@ void videoTask(void *arg)
         if (previous_scale_enabled != scaling_enabled)
         {
             // Clear display
-            ili9341_write_frame_gb(NULL, 1);
+            ili9341_write_frame_gb(NULL, 1, &scaling_line_mask);
             previous_scale_enabled = scaling_enabled;
         }
 
         gbaext_before_screen_write();
 
-        ili9341_write_frame_gb(param, scaling_enabled);
+        ili9341_write_frame_gb(param, scaling_enabled, &scaling_line_mask);
         odroid_input_battery_level_read(&battery_state);
 
         gbaext_after_screen_write();
@@ -1553,7 +1593,8 @@ void app_main(void)
     loader_init(NULL);
 
     // Clear display
-    ili9341_write_frame_gb(NULL, true);
+    scaling_line_mask_reset();
+    ili9341_write_frame_gb(NULL, true, &scaling_line_mask);
 
     // Audio hardware
     odroid_audio_init(AUDIO_SAMPLE_RATE);
