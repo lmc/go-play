@@ -209,6 +209,7 @@ int menu_draw_bg_x = 0;
 int menu_draw_bg_y = 0;
 int menu_draw_bg_w = 160;
 int menu_draw_bg_h = 144;
+bool menu_draw_cursor = true;
 
 uint16_t menu_draw_text_color = 0x0000;
 
@@ -456,6 +457,7 @@ void menu_init_1(){
   add_menu_item_value("Brightness",0,&menu_item_callback_brightness);
   add_menu_item_value("Scaling",0,&menu_item_callback_scaling);
   add_menu_item_submenu("RTC",2);
+  add_menu_item_submenu("Happiness",3);
   add_menu_item("Save State",&menu_item_callback_save_state);
   add_menu_item("Exit Emulator",&menu_item_callback_exit);
   add_menu_item_submenu("Exit Menu",0);
@@ -512,6 +514,56 @@ void menu_init_2(){
   previous_menu_id = 1;
 };
 
+byte pokemon_char_to_ascii(byte pokemon_char){
+  if(pokemon_char == 0x50)
+    return 0x00;
+  if(pokemon_char >= 0x80 && pokemon_char <= 0x99)
+    return (pokemon_char - 0x80) + 65;
+  return 0x00;
+};
+
+void read_pokemon_string(char* buf,uint16_t addr){
+  bool ended = false;
+  for(int i = 0; i < 16; i++){
+    byte val = 0;
+    if(!ended){
+      val = mem_read(addr + i);
+      val = pokemon_char_to_ascii(val);
+      if(!val)
+        ended = true;
+    }
+    buf[i] = val;
+  }
+};
+
+void menu_init_3(){
+  menu_draw_x_label = 20;
+  menu_draw_x_value = 100;
+  menu_draw_cursor = false;
+
+  add_menu_item("Happiness",0);
+  add_menu_item(" ",0);
+
+  byte party_size = mem_read( 0xDCD7 );
+  for(int i = 0; i < party_size; i++){
+    uint16_t pokemon_name_addr = 0xde41 + (i * 11);
+    add_menu_item_value("PokemonName",0,0);
+
+    char name[16];
+    read_pokemon_string(&name,pokemon_name_addr);
+    sprintf(menu_items[menu_item_index-1].label,"%s",name);
+
+    uint16_t pokemon_struct_addr = 0xdcdf + (i * 48);
+    byte value = mem_read( pokemon_struct_addr + 27 );
+    sprintf(menu_items[menu_item_index-1].value_label,"%d",value);
+  }
+
+  add_menu_item(" ",0);
+  add_menu_item_submenu("Back",1);
+
+  previous_menu_id = 1;
+};
+
 void show_menu(byte menu_id){
   menu_visible = menu_id;
 
@@ -528,6 +580,7 @@ void show_menu(byte menu_id){
   menu_draw_bg_w = 160;
   menu_draw_bg_h = 90;
   menu_draw_text_color = 0xffff;
+  menu_draw_cursor = true;
 
   for(int i = 0; i < MAX_MENU_ITEMS; i++){
     menu_items[i].label[0] = 0;
@@ -544,6 +597,9 @@ void show_menu(byte menu_id){
     break;
     case 2:
       menu_init_2();
+    break;
+    case 3:
+      menu_init_3();
     break;
   }
 
@@ -1092,10 +1148,12 @@ void gbaext_before_draw_frame(){
     for(int i = 0; i < MAX_MENU_ITEMS; i++){
       if(menu_items[i].label[0]){
         setCursor(menu_draw_x_label,menu_draw_y + (i * menu_draw_row_height));
-        if(i == menu_item_index){
-          drawPrint("> ");
-        }else{
-          drawPrint("  ");
+        if(menu_draw_cursor){
+          if(i == menu_item_index){
+            drawPrint("> ");
+          }else{
+            drawPrint("  ");
+          }
         }
         drawPrint(menu_items[i].label);
         setCursor(menu_draw_x_value,menu_draw_y + (i * menu_draw_row_height));
