@@ -347,15 +347,19 @@ void menu_item_callback_rtc(byte m, byte button){
       switch(m){
         case 0:
           value = value_decr(value,0,1,false);
+          rtc.carry = value;
         break;
         case 1:
           value = value_decr(value,0,364,false);
+          rtc.d = value;
         break;
         case 2:
           value = value_decr(value,0,23,true);
+          rtc.h = value;
         break;
         case 3:
           value = value_decr(value,0,59,true);
+          rtc.m = value;
         break;
       }
     break;
@@ -363,15 +367,19 @@ void menu_item_callback_rtc(byte m, byte button){
       switch(m){
         case 0:
           value = value_incr(value,0,1,false);
+          rtc.carry = value;
         break;
         case 1:
           value = value_incr(value,0,364,false);
+          rtc.d = value;
         break;
         case 2:
           value = value_incr(value,0,23,true);
+          rtc.h = value;
         break;
         case 3:
           value = value_incr(value,0,59,true);
+          rtc.m = value;
         break;
       }
     break;
@@ -447,29 +455,58 @@ void menu_init_1(){
   add_menu_item_value("Volume",0,&menu_item_callback_volume);
   add_menu_item_value("Brightness",0,&menu_item_callback_brightness);
   add_menu_item_value("Scaling",0,&menu_item_callback_scaling);
-
-  // add_menu_item_value("RTC Carry",0,&menu_item_callback_rtc_c);
-  // add_menu_item_value("RTC Day",0,&menu_item_callback_rtc_d);
-  // add_menu_item_value("RTC Hour",0,&menu_item_callback_rtc_h);
-  // add_menu_item_value("RTC Minute",0,&menu_item_callback_rtc_m);
   add_menu_item_submenu("RTC",2);
-
   add_menu_item("Save State",&menu_item_callback_save_state);
   add_menu_item("Exit Emulator",&menu_item_callback_exit);
+  add_menu_item_submenu("Exit Menu",0);
 
   previous_menu_id = 0;
 };
 
 void menu_2_tick(byte button){
-  menu_draw_text_color = 0xf000;
+  byte game_start_d = mem_read(0xd4b6);
+  byte game_start_h = mem_read(0xd4b7);
+  byte game_start_m = mem_read(0xd4b8);
+  byte game_start_s = mem_read(0xd4b9);
+  // byte dst = mem_read(0xd4c2);
+
+  int day = game_start_d + rtc.d;
+  if(rtc.carry)
+    day += 365;
+
+  int week = day / 7;
+  byte weekday = day % 7;
+
+  int hour = (game_start_h + rtc.h);
+  // if(dst)
+  //   hour++;
+  int min = (game_start_m + rtc.m);
+  int sec = (game_start_s + rtc.s);
+
+  sprintf(menu_items[4].value_label,"%d",week);
+  sprintf(menu_items[5].value_label,"%d",day);
+  sprintf(menu_items[6].value_label,"%d",weekday);
+  sprintf(menu_items[7].value_label,"%d,%d,%d",hour,rtc.h,game_start_h);
+  sprintf(menu_items[8].value_label,"%d,%d,%d",min,rtc.m,game_start_m);
+  sprintf(menu_items[9].value_label,"%d,%d,%d",sec,rtc.s,game_start_s);
 };
 
 void menu_init_2(){
+  menu_draw_x_value = 90;
+
   add_menu_item_value("RTC Carry",0,&menu_item_callback_rtc_c);
   add_menu_item_value("RTC Day",0,&menu_item_callback_rtc_d);
   add_menu_item_value("RTC Hour",0,&menu_item_callback_rtc_h);
   add_menu_item_value("RTC Minute",0,&menu_item_callback_rtc_m);
 
+  add_menu_item_value("Game Week",0,0);
+  add_menu_item_value("Game Day",0,0);
+  add_menu_item_value("Game Weekday",0,0);
+  add_menu_item_value("Game Hour",0,0);
+  add_menu_item_value("Game Minute",0,0);
+  add_menu_item_value("Game Second",0,0);
+
+  add_menu_item_submenu("Back",1);
   menu_tick_callback = menu_2_tick;
 
   previous_menu_id = 1;
